@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
+from streamlit_gsheets import GSheetsConnection
 
 # --- 設定頁面資訊 ---
 st.set_page_config(page_title="慢箋領藥提醒系統", layout="wide")
@@ -77,26 +78,47 @@ def check_status(row):
 
 # --- 資料處理 ---
 
-# 模擬資料庫路徑 (正式版建議改為 Google Sheets 連線)
-CSV_FILE = 'patients_data.csv'
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Qu_f2aStXeasb4yW4GsSWTURUnXrIexFSoaDZ13CBME/edit"
 
 def load_data():
+    """從 Google Sheets 讀取資料"""
+    # 建立連線物件
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    
+    # 讀取資料，ttl=0 代表不快取，每次都抓最新資料
     try:
-        df = pd.read_csv(CSV_FILE)
-        # 轉換日期欄位格式
+        df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
+        
+        # 如果是空的或欄位不對，處理一下
+        if df.empty:
+            return pd.DataFrame(columns=[
+                '個案姓名', '出生年月日', '性別', '第一次領藥日', 
+                '處方天數', '居住里別', '已領第二次', '已領第三次'
+            ])
+            
+        # 轉換日期格式 (Google Sheet 讀下來通常是字串)
         date_cols = ['出生年月日', '第一次領藥日']
         for col in date_cols:
-            df[col] = pd.to_datetime(df[col]).dt.date
+            df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
+            
+        # 確保布林值欄位正確
+        df['已領第二次'] = df['已領第二次'].fillna(False).astype(bool)
+        df['已領第三次'] = df['已領第三次'].fillna(False).astype(bool)
+            
         return df
-    except FileNotFoundError:
-        # 如果檔案不存在，建立一個空的 DataFrame
-        return pd.DataFrame(columns=[
-            '個案姓名', '出生年月日', '性別', '第一次領藥日', 
-            '處方天數', '居住里別', '已領第二次', '已領第三次'
-        ])
+    except Exception as e:
+        st.error(f"讀取資料失敗: {e}")
+        return pd.DataFrame()
 
 def save_data(df):
-    df.to_csv(CSV_FILE, index=False)
+    """將資料寫回 Google Sheets"""
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    try:
+        # update 方法會直接覆蓋整張工作表內容
+        conn.update(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", data=df)
+        st.toast("資料已儲存至雲端！", icon="☁️") # 顯示一個小通知
+    except Exception as e:
+        st.error(f"寫入資料失敗: {e}")
 
 # --- 介面設計 (UI) ---
 
