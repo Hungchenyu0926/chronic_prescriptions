@@ -118,11 +118,14 @@ def load_data():
 def save_data(df):
     conn = st.connection("gsheets", type=GSheetsConnection)
     try:
+        # 嘗試寫入
         conn.update(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", data=df)
         st.toast("資料已儲存至雲端！", icon="☁️")
     except Exception as e:
-        st.error(f"寫入資料失敗: {e}")
-
+        # 發生錯誤時，直接在網頁上印出紅色大字
+        st.error(f"寫入失敗！詳細原因：{e}")
+        # 同時印在後台 logs (如果您是在電腦跑)
+        print(f"寫入失敗：{e}")
 # --- 介面設計 (UI) ---
 
 st.title("🏥 慢箋領藥管理與提醒系統")
