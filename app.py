@@ -1,40 +1,48 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, timedelta, datetime
-from dateutil.relativedelta import relativedelta
+from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
 
 # --- 設定頁面資訊 ---
 st.set_page_config(page_title="慢箋領藥提醒系統", layout="wide")
 
-# --- 核心邏輯函數 ---
+# --- 核心邏輯函數 (修正版) ---
 
 def calculate_age(born):
     """根據出生年月日計算年齡"""
+    if not born: return 0
     today = date.today()
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 def calculate_dates(start_date, duration):
     """
-    計算慢箋的各個關鍵日期
-    回傳: 字典 (包含所有計算出的日期)
+    計算慢箋的各個關鍵日期 (邏輯修正版)
     """
-    # 第一次週期結束 (即第二次可領藥的最後一天)
+    if not start_date:
+        return {}
+
+    # 1. 第一次週期結束 (即第二次可領藥的期限)
+    # 邏輯: 12/09 + 28 = 01/06
     end_cycle_1 = start_date + timedelta(days=duration)
     
-    # 第二次領藥區間 (前10天開始 ~ 週期1結束)
-    second_start = end_cycle_1 - timedelta(days=10)
-    second_end = end_cycle_1 # 通常領藥期限到藥吃完那天
+    # 2. 第二次領藥區間
+    # 邏輯: 包含結束日往前推10天，故減 9 (例如 1/6 - 9 = 12/28)
+    second_start = end_cycle_1 - timedelta(days=9)
+    second_end = end_cycle_1 
     
-    # 第二次週期結束 (即第三次可領藥的最後一天)
+    # 3. 第二次週期結束 (即第三次可領藥的期限)
+    # 邏輯: 01/06 + 28 = 02/03
     end_cycle_2 = end_cycle_1 + timedelta(days=duration)
     
-    # 第三次領藥區間
-    third_start = end_cycle_2 - timedelta(days=10)
+    # 4. 第三次領藥區間
+    # 邏輯: 02/03 - 9 = 01/25
+    third_start = end_cycle_2 - timedelta(days=9)
     third_end = end_cycle_2
     
-    # 建議回診日 (第三次週期結束，藥吃完那天)
-    return_visit = end_cycle_2 + timedelta(days=duration)
+    # 5. 建議回診日
+    # 邏輯: 第三次藥吃完 (02/03 + 28 = 03/03)，建議隔天回診 (03/04)
+    end_cycle_3 = end_cycle_2 + timedelta(days=duration)
+    return_visit = end_cycle_3 + timedelta(days=1)
     
     return {
         "2nd_start": second_start,
@@ -46,6 +54,9 @@ def calculate_dates(start_date, duration):
 
 def check_status(row):
     """判斷目前的狀態並給予提醒標籤"""
+    if pd.isna(row['第一次領藥日']):
+        return "資料不全"
+
     today = date.today()
     
     # 檢查第二次
@@ -66,7 +77,7 @@ def check_status(row):
             if today < row['3rd_start']:
                 return "⚠️ 即將進入第三次領藥期 (前7天預告)"
             return "🔴 請領取第三次藥物"
-        elif today > row['3rd_end'] and row['已領第二次']: # 只有在第二次領過才顯示第三次過期
+        elif today > row['3rd_end'] and row['已領第二次']:
              return "❌ 第三次領藥已過期"
              
     if row['已領第二次'] and row['已領第三次']:
@@ -76,32 +87,26 @@ def check_status(row):
         
     return "一般追蹤中"
 
-# --- 資料處理 ---
+# --- 資料處理 (Google Sheets 版本) ---
 
-SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Qu_f2aStXeasb4yW4GsSWTURUnXrIexFSoaDZ13CBME/edit"
+# 請確認您的 Secrets 設定正確
+SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Qu_f2aStXeasb4yW4GsSWTURUnXrIexFSoaDZ13CBME/edit?hl=zh-TW&gid=0#gid=0"
 
 def load_data():
-    """從 Google Sheets 讀取資料"""
-    # 建立連線物件
     conn = st.connection("gsheets", type=GSheetsConnection)
-    
-    # 讀取資料，ttl=0 代表不快取，每次都抓最新資料
     try:
         df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
         
-        # 如果是空的或欄位不對，處理一下
         if df.empty:
             return pd.DataFrame(columns=[
                 '個案姓名', '出生年月日', '性別', '第一次領藥日', 
                 '處方天數', '居住里別', '已領第二次', '已領第三次'
             ])
             
-        # 轉換日期格式 (Google Sheet 讀下來通常是字串)
         date_cols = ['出生年月日', '第一次領藥日']
         for col in date_cols:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
             
-        # 確保布林值欄位正確
         df['已領第二次'] = df['已領第二次'].fillna(False).astype(bool)
         df['已領第三次'] = df['已領第三次'].fillna(False).astype(bool)
             
@@ -111,12 +116,10 @@ def load_data():
         return pd.DataFrame()
 
 def save_data(df):
-    """將資料寫回 Google Sheets"""
     conn = st.connection("gsheets", type=GSheetsConnection)
     try:
-        # update 方法會直接覆蓋整張工作表內容
         conn.update(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", data=df)
-        st.toast("資料已儲存至雲端！", icon="☁️") # 顯示一個小通知
+        st.toast("資料已儲存至雲端！", icon="☁️")
     except Exception as e:
         st.error(f"寫入資料失敗: {e}")
 
@@ -124,7 +127,6 @@ def save_data(df):
 
 st.title("🏥 慢箋領藥管理與提醒系統")
 
-# 初始化資料
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
@@ -133,11 +135,11 @@ with st.sidebar:
     st.header("📝 新增個案資料")
     with st.form("add_patient_form"):
         name = st.text_input("個案姓名")
-        dob = st.date_input("出生年月日", min_value=date(1920, 1, 1))
+        dob = st.date_input("出生年月日", min_value=date(1920, 1, 1), value=date(1960, 1, 1))
         gender = st.selectbox("性別", ["男", "女"])
         district = st.text_input("居住里別")
         first_date = st.date_input("第一次領藥年月日", value=date.today())
-        duration = st.selectbox("處方箋時間", [28, 30])
+        duration = st.selectbox("處方箋時間", [28, 30], index=0) # 預設28天
         
         submitted = st.form_submit_button("新增資料")
         
@@ -152,9 +154,12 @@ with st.sidebar:
                 '已領第二次': False,
                 '已領第三次': False
             }
-            st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_data])], ignore_index=True)
+            # 轉換為 DataFrame 並合併
+            new_df = pd.DataFrame([new_data])
+            st.session_state.df = pd.concat([st.session_state.df, new_df], ignore_index=True)
             save_data(st.session_state.df)
             st.success(f"已新增 {name}")
+            st.rerun()
 
 # 主畫面：資料運算與顯示
 if not st.session_state.df.empty:
@@ -165,24 +170,29 @@ if not st.session_state.df.empty:
     display_df['年齡'] = display_df['出生年月日'].apply(calculate_age)
     
     # 2. 計算所有日期區間
+    # 確保第一次領藥日是 date 類型，避免錯誤
+    display_df['第一次領藥日'] = pd.to_datetime(display_df['第一次領藥日']).dt.date
+
     date_calculations = display_df.apply(
         lambda row: calculate_dates(row['第一次領藥日'], row['處方天數']), axis=1
     )
     
     # 將計算結果展開到 DataFrame
     dates_df = pd.DataFrame(date_calculations.tolist())
+    # 重設 index 確保對齊
+    display_df = display_df.reset_index(drop=True)
+    dates_df = dates_df.reset_index(drop=True)
     display_df = pd.concat([display_df, dates_df], axis=1)
     
     # 3. 產生提醒狀態
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
-    # 4. 顯示重點提醒區塊 (Dashboard)
+    # 4. 顯示重點提醒區塊
     st.subheader("🔔 需要關注的名單 (前一週提醒)")
-    urgent_cases = display_df[display_df['目前狀態'].str.contains("🔴|⚠️|🏥")]
+    urgent_cases = display_df[display_df['目前狀態'].str.contains("🔴|⚠️|🏥", na=False)]
     
     if not urgent_cases.empty:
         st.warning(f"共有 {len(urgent_cases)} 位個案需要通知！")
-        # 精簡顯示重點欄位
         st.dataframe(
             urgent_cases[['個案姓名', '目前狀態', '2nd_start', '2nd_end', '3rd_start', '3rd_end', '居住里別']],
             use_container_width=True
@@ -194,36 +204,37 @@ if not st.session_state.df.empty:
     
     # 5. 完整資料管理與編輯
     st.subheader("📋 所有個案資料管理")
-    st.caption("您可以直接在下方表格勾選「已領藥」來更新狀態")
     
-    # 使用 data_editor 讓使用者可以直接編輯 Checkbox
     edited_df = st.data_editor(
         display_df,
         column_config={
-            "已領第二次": st.column_config.CheckboxColumn("已領第二次", help="勾選代表已完成領藥"),
-            "已領第三次": st.column_config.CheckboxColumn("已領第三次", help="勾選代表已完成領藥"),
-            "出生年月日": None, # 隱藏原始欄位，只看年齡
+            "已領第二次": st.column_config.CheckboxColumn("已領2次", help="勾選代表已完成"),
+            "已領第三次": st.column_config.CheckboxColumn("已領3次", help="勾選代表已完成"),
+            "出生年月日": None, 
             "2nd_start": st.column_config.DateColumn("2次起始", format="MM/DD"),
             "2nd_end": st.column_config.DateColumn("2次結束", format="MM/DD"),
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("建議回診", format="YYYY/MM/DD"),
         },
-        disabled=["個案姓名", "年齡", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"], # 禁止編輯計算欄位
+        disabled=["個案姓名", "年齡", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
         use_container_width=True,
         hide_index=True
     )
     
-    # 檢查是否有更動，若有則存檔
-    # 比對原始 checkbox 狀態與編輯後的狀態
+    # 檢查是否有更動
     cols_to_check = ['已領第二次', '已領第三次']
-    if not edited_df[cols_to_check].equals(st.session_state.df[cols_to_check]):
-        # 更新 session_state
+    
+    # 簡單比較法：檢查 session_state 的資料與編輯後的資料是否一致
+    # 這裡將 NaN 填補為 False 以避免比較錯誤
+    original_check = st.session_state.df[cols_to_check].fillna(False)
+    new_check = edited_df[cols_to_check].fillna(False)
+    
+    if not new_check.equals(original_check):
         st.session_state.df['已領第二次'] = edited_df['已領第二次']
         st.session_state.df['已領第三次'] = edited_df['已領第三次']
-        # 存入檔案 (CSV 或 Google Sheets)
         save_data(st.session_state.df)
-        st.rerun() # 重新整理頁面以更新「目前狀態」
+        st.rerun()
 
 else:
     st.info("目前尚無資料，請從左側新增個案。")
