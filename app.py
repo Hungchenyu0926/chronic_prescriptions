@@ -131,7 +131,15 @@ with st.sidebar:
     st.header("📝 新增個案資料")
     with st.form("add_patient_form"):
         name = st.text_input("個案姓名")
-        dob = st.date_input("出生年月日", min_value=date(1920, 1, 1), value=date(1960, 1, 1))
+        
+        # 👇 修改重點在這裡
+        dob = st.date_input(
+            "出生年月日", 
+            min_value=date(1900, 1, 1), # 範圍擴大至 1900 年
+            max_value=date.today(),     # 不能超過今天
+            value=date(2025, 1, 1)      # 預設顯示 2025/01/01
+        )
+        
         gender = st.selectbox("性別", ["男", "女"])
         district = st.text_input("居住里別")
         first_date = st.date_input("第一次領藥年月日", value=date.today())
@@ -158,21 +166,17 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # --- 新增的刪除功能區塊 ---
+    # --- 刪除個案功能區塊 ---
     with st.expander("🗑️ 刪除個案功能"):
         if not st.session_state.df.empty:
-            # 取得所有姓名列表
             patient_list = st.session_state.df['個案姓名'].tolist()
-            # 讓使用者選擇要刪除的名字 (支援多選)
             patients_to_delete = st.multiselect("請選擇要刪除的姓名", patient_list)
             
             if st.button("確認刪除", type="primary"):
                 if patients_to_delete:
-                    # 邏輯: 保留「不在」刪除名單中的資料
                     st.session_state.df = st.session_state.df[
                         ~st.session_state.df['個案姓名'].isin(patients_to_delete)
                     ]
-                    # 存檔並重整
                     save_data(st.session_state.df)
                     st.success(f"已刪除: {', '.join(patients_to_delete)}")
                     st.rerun()
