@@ -75,7 +75,11 @@ st.markdown("""
 # 3. 自定義簡潔標題 (Header) - 修正顯示錯誤
 # ==========================================
 
-# 修正：將 HTML 存入變數，確保格式正確
+# ==========================================
+# 3. 自定義簡潔標題 (Header) - 修正版本
+# ==========================================
+
+# 修正：確保所有 HTML 標籤正確閉合
 header_html = """
 <div style="
     background-color: white; 
@@ -107,6 +111,9 @@ header_html = """
     </div>
 </div>
 """
+
+# 渲染標題
+st.markdown(header_html, unsafe_allow_html=True)
 
 # 渲染標題
 st.markdown(header_html, unsafe_allow_html=True)
