@@ -9,13 +9,105 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layout="wide")
 
 # ==========================================
-# 2. 強制修復 UI (CSS + Header)
+# 2. UI 風格設定 (CSS)
 # ==========================================
+st.markdown("""
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 全域設定 */
+        html, body, [class*="css"] {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f6f7f8; /* 淺灰背景 */
+        }
+        
+        /* 隱藏 Streamlit 原生 Header */
+        header[data-testid="stHeader"] { visibility: hidden; }
+        .stAppHeader { visibility: hidden; }
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
+        
+        /* 調整頂部間距，讓我們的自訂標題能貼頂 */
+        .block-container {
+            padding-top: 2rem !important;
+            padding-bottom: 5rem !important;
+            max-width: 1440px;
+        }
 
+        /* 輸入框美化 (白底、灰邊框、圓角) */
+        .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
+            border-radius: 0.5rem;
+            border: 1px solid #e7edf3;
+            background-color: white;
+            color: #0e141b;
+            padding: 0.5rem;
+        }
+        
+        /* 按鈕美化 (藍色背景) */
+        .stButton button[kind="primary"] {
+            background-color: #197fe6;
+            border: none;
+            color: white;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            font-weight: bold;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .stButton button[kind="primary"]:hover {
+            background-color: #1466b8;
+        }
+        
+        /* 表格區塊美化 (白底卡片效果) */
+        div[data-testid="stDataFrame"] {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #e7edf3;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 3. 自定義簡潔標題 (Header) - 無按鈕版
+# ==========================================
+st.markdown("""
+    <div style="
+        background-color: white; 
+        border-bottom: 1px solid #e7edf3; 
+        padding: 1rem 2rem; 
+        margin-bottom: 2rem; 
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    ">
+        <div style="
+            width: 3rem; 
+            height: 3rem; 
+            background-color: rgba(25, 127, 230, 0.1); 
+            border-radius: 0.5rem; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            color: #197fe6;
+        ">
+            <span class="material-symbols-outlined" style="font-size: 32px;">medication_liquid</span>
+        </div>
+        
+        <div>
+            <h1 style="font-size: 1.5rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
+            <p style="font-size: 0.875rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 
 # ==========================================
-# 3. 核心邏輯 (Python Backend)
+# 4. 核心邏輯 (Backend Logic)
 # ==========================================
 
 def calculate_age(born):
@@ -99,17 +191,10 @@ if 'df' not in st.session_state:
     st.session_state.df = load_data()
 
 # ==========================================
-# 4. 主內容區域 (Main Content)
+# 5. 主內容區域 (Main Content)
 # ==========================================
 
-col_head1, col_head2 = st.columns([3, 1])
-with col_head1:
-    st.markdown("""
-        <h2 class="text-3xl font-black text-[#0e141b] tracking-tight mb-2">個案管理儀表板</h2>
-        <p class="text-[#4e7397] text-base mb-6">管理慢性病連續處方箋個案資料與自動計算領藥提醒</p>
-    """, unsafe_allow_html=True)
-
-# --- 新增個案表單 ---
+# --- 新增個案表單 (卡片樣式) ---
 st.markdown("""
 <div class="bg-white rounded-xl border border-[#e7edf3] shadow-sm overflow-hidden mb-8">
     <div class="px-6 py-4 border-b border-[#e7edf3] flex items-center gap-2 bg-gray-50/50">
@@ -119,6 +204,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# 表單邏輯
 with st.container():
     with st.form("add_patient_form", border=True): 
         c1, c2, c3 = st.columns(3)
@@ -149,7 +235,7 @@ with st.container():
             st.success(f"已成功新增：{name}")
             st.rerun()
 
-# --- 資料列表區塊 ---
+# --- 資料列表區塊 (卡片樣式) ---
 st.markdown("""
 <div class="bg-white rounded-t-xl border-t border-l border-r border-[#e7edf3] shadow-sm mt-8">
     <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/50 border-b border-[#e7edf3]">
@@ -164,6 +250,7 @@ st.markdown("""
 if not st.session_state.df.empty:
     display_df = st.session_state.df.copy()
     
+    # 運算邏輯
     display_df['年齡'] = display_df['出生年月日'].apply(calculate_age)
     display_df['第一次領藥日'] = pd.to_datetime(display_df['第一次領藥日']).dt.date
     date_calculations = display_df.apply(lambda row: calculate_dates(row['第一次領藥日'], row['處方天數']), axis=1)
@@ -173,6 +260,7 @@ if not st.session_state.df.empty:
     display_df = pd.concat([display_df, dates_df], axis=1)
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
+    # 顯示表格
     edited_df = st.data_editor(
         display_df,
         column_config={
@@ -195,6 +283,7 @@ if not st.session_state.df.empty:
         height=500
     )
 
+    # 儲存邏輯
     cols_to_check = ['已領第二次', '已領第三次']
     original_check = st.session_state.df[cols_to_check].fillna(False).reset_index(drop=True)
     new_check = edited_df[cols_to_check].fillna(False).reset_index(drop=True)
@@ -205,6 +294,7 @@ if not st.session_state.df.empty:
         save_data(st.session_state.df)
         st.rerun()
 
+    # 刪除功能
     st.markdown("<div class='mt-4'></div>", unsafe_allow_html=True)
     with st.expander("🗑️ 進階管理：刪除個案"):
         col_del_1, col_del_2 = st.columns([4, 1])
@@ -223,4 +313,5 @@ if not st.session_state.df.empty:
                     st.success(f"已刪除: {', '.join(patients_to_delete)}")
                     st.rerun()
 else:
+    st.info("目前尚無資料，請從上方新增個案。")
     st.info("目前尚無資料，請從上方新增個案。")
