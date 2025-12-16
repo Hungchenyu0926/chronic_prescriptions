@@ -71,49 +71,57 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 3. 自定義簡潔標題 (Header) - 修正顯示錯誤
-# ==========================================
 
 # ==========================================
 # 3. 自定義簡潔標題 (Header) - 修正版本
 # ==========================================
 
 # 修正：確保所有 HTML 標籤正確閉合
-header_html = """
-<div style="
-    background-color: white; 
-    border-bottom: 1px solid #e7edf3; 
-    padding: 1.5rem 2rem; 
-    margin-bottom: 2rem; 
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+header_html = """<div style="
+background-color: white; 
+border-bottom: 1px solid #e7edf3; 
+padding: 1.5rem 2rem; 
+margin-bottom: 2rem; 
+border-radius: 0.5rem;
+box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+display: flex;
+align-items: center;
+gap: 1rem;
 ">
-    <div style="
-        width: 3.5rem; 
-        height: 3.5rem; 
-        background-color: rgba(25, 127, 230, 0.1); 
-        border-radius: 0.5rem; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        color: #197fe6;
-    ">
-        <span class="material-symbols-outlined" style="font-size: 36px;">medication_liquid</span>
-    </div>
-    
-    <div>
-        <h1 style="font-size: 1.75rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
-        <p style="font-size: 0.95rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
-    </div>
-</div>
-"""
+  <div style="
+  width: 3.5rem; 
+  height: 3.5rem; 
+  background-color: rgba(25, 127, 230, 0.1); 
+  border-radius: 0.5rem; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  color: #197fe6;
+  ">
+    <span class="material-symbols-outlined" style="font-size: 36px;">
+      medication_liquid
+    </span>
+  </div>
 
-# 渲染標題
-st.markdown(header_html, unsafe_allow_html=True)
+  <div>
+    <h1 style="
+    font-size: 1.75rem; 
+    font-weight: 800; 
+    color: #0e141b; 
+    margin: 0; 
+    line-height: 1.2;
+    ">
+      慢箋提醒管理系統
+    </h1>
+    <p style="
+    font-size: 0.95rem; 
+    color: #4e7397; 
+    margin: 0;
+    ">
+      自動計算領藥區間與回診提醒
+    </p>
+  </div>
+</div>"""
 
 # 渲染標題
 st.markdown(header_html, unsafe_allow_html=True)
