@@ -11,6 +11,7 @@ st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layo
 # ==========================================
 # 2. UI 風格設定 (CSS)
 # ==========================================
+# 將 CSS 與 HTML 分開處理，確保樣式載入正常
 st.markdown("""
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -20,7 +21,7 @@ st.markdown("""
         /* 全域設定 */
         html, body, [class*="css"] {
             font-family: 'Inter', 'Noto Sans TC', sans-serif;
-            background-color: #f6f7f8; /* 淺灰背景 */
+            background-color: #f6f7f8;
         }
         
         /* 隱藏 Streamlit 原生 Header */
@@ -29,14 +30,14 @@ st.markdown("""
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
         
-        /* 調整頂部間距，讓我們的自訂標題能貼頂 */
+        /* 調整頂部間距 */
         .block-container {
             padding-top: 2rem !important;
             padding-bottom: 5rem !important;
             max-width: 1440px;
         }
 
-        /* 輸入框美化 (白底、灰邊框、圓角) */
+        /* 輸入框美化 */
         .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
             border-radius: 0.5rem;
             border: 1px solid #e7edf3;
@@ -45,7 +46,7 @@ st.markdown("""
             padding: 0.5rem;
         }
         
-        /* 按鈕美化 (藍色背景) */
+        /* 按鈕美化 */
         .stButton button[kind="primary"] {
             background-color: #197fe6;
             border: none;
@@ -59,7 +60,7 @@ st.markdown("""
             background-color: #1466b8;
         }
         
-        /* 表格區塊美化 (白底卡片效果) */
+        /* 表格區塊美化 */
         div[data-testid="stDataFrame"] {
             background-color: white;
             padding: 1rem;
@@ -71,39 +72,44 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. 自定義簡潔標題 (Header) - 無按鈕版
+# 3. 自定義簡潔標題 (Header) - 修正顯示錯誤
 # ==========================================
-st.markdown("""
+
+# 修正：將 HTML 存入變數，確保格式正確
+header_html = """
+<div style="
+    background-color: white; 
+    border-bottom: 1px solid #e7edf3; 
+    padding: 1.5rem 2rem; 
+    margin-bottom: 2rem; 
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+">
     <div style="
-        background-color: white; 
-        border-bottom: 1px solid #e7edf3; 
-        padding: 1rem 2rem; 
-        margin-bottom: 2rem; 
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        display: flex;
-        align-items: center;
-        gap: 1rem;
+        width: 3.5rem; 
+        height: 3.5rem; 
+        background-color: rgba(25, 127, 230, 0.1); 
+        border-radius: 0.5rem; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        color: #197fe6;
     ">
-        <div style="
-            width: 3rem; 
-            height: 3rem; 
-            background-color: rgba(25, 127, 230, 0.1); 
-            border-radius: 0.5rem; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            color: #197fe6;
-        ">
-            <span class="material-symbols-outlined" style="font-size: 32px;">medication_liquid</span>
-        </div>
-        
-        <div>
-            <h1 style="font-size: 1.5rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
-            <p style="font-size: 0.875rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
-        </div>
+        <span class="material-symbols-outlined" style="font-size: 36px;">medication_liquid</span>
     </div>
-""", unsafe_allow_html=True)
+    
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
+        <p style="font-size: 0.95rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
+    </div>
+</div>
+"""
+
+# 渲染標題
+st.markdown(header_html, unsafe_allow_html=True)
 
 
 # ==========================================
@@ -194,18 +200,19 @@ if 'df' not in st.session_state:
 # 5. 主內容區域 (Main Content)
 # ==========================================
 
-# --- 新增個案表單 (卡片樣式) ---
+# --- 新增個案表單 (標題) ---
+# 使用 HTML 來渲染表單的標題區塊，確保與上方風格一致
 st.markdown("""
-<div class="bg-white rounded-xl border border-[#e7edf3] shadow-sm overflow-hidden mb-8">
-    <div class="px-6 py-4 border-b border-[#e7edf3] flex items-center gap-2 bg-gray-50/50">
-        <span class="material-symbols-outlined text-[#197fe6]">person_add</span>
-        <h3 class="text-lg font-bold text-[#0e141b]">新增個案資料</h3>
-    </div>
+<div style="background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; margin-bottom: -1px;">
+    <span class="material-symbols-outlined" style="color: #197fe6;">person_add</span>
+    <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">新增個案資料</span>
 </div>
 """, unsafe_allow_html=True)
 
-# 表單邏輯
+# --- 新增個案表單 (內容) ---
+# 使用 Streamlit Form
 with st.container():
+    # 增加一個外層的 div 來模擬卡片邊框的下半部 (透過 CSS 影響 stForm)
     with st.form("add_patient_form", border=True): 
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -235,15 +242,11 @@ with st.container():
             st.success(f"已成功新增：{name}")
             st.rerun()
 
-# --- 資料列表區塊 (卡片樣式) ---
+# --- 資料列表區塊 ---
 st.markdown("""
-<div class="bg-white rounded-t-xl border-t border-l border-r border-[#e7edf3] shadow-sm mt-8">
-    <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/50 border-b border-[#e7edf3]">
-        <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-[#197fe6]">list_alt</span>
-            <h3 class="text-lg font-bold text-[#0e141b]">個案資料列表</h3>
-        </div>
-    </div>
+<div style="margin-top: 2rem; background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e7edf3;">
+    <span class="material-symbols-outlined" style="color: #197fe6;">list_alt</span>
+    <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">個案資料列表</span>
 </div>
 """, unsafe_allow_html=True)
 
@@ -313,5 +316,4 @@ if not st.session_state.df.empty:
                     st.success(f"已刪除: {', '.join(patients_to_delete)}")
                     st.rerun()
 else:
-    st.info("目前尚無資料，請從上方新增個案。")
     st.info("目前尚無資料，請從上方新增個案。")
