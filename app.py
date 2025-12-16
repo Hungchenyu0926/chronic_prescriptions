@@ -9,34 +9,34 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layout="wide")
 
 # ==========================================
-# 2. UI 介面注入 (CSS + Header) - 修正版
+# 2. 強制修復 UI (CSS + Header)
 # ==========================================
-# 請注意：這是一個完整的 Python 函數呼叫，請勿修改內部的引號
 st.markdown("""
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     
     <style>
-        /* 全域樣式設定 */
+        /* 1. 全域字型與背景 */
         html, body, [class*="css"] {
             font-family: 'Inter', 'Noto Sans TC', sans-serif;
             background-color: #f6f7f8;
         }
         
-        /* 隱藏 Streamlit 預設元件 */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;} 
+        /* 2. 徹底隱藏 Streamlit 原生 Header 與 Footer (關鍵修正) */
+        header[data-testid="stHeader"] { display: none !important; }
+        .stAppHeader { display: none !important; }
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
         
-        /* 修正主內容區塊，避免被自訂 Header 遮擋 */
+        /* 3. 調整主內容區塊，避免內容被切掉 */
         .block-container {
-            padding-top: 0rem !important;
+            padding-top: 1rem !important; /* 原本可能是 6rem，改小一點因為我們有自製 Header */
             padding-bottom: 5rem !important;
             max-width: 1440px;
         }
 
-        /* Streamlit 輸入框美化 */
+        /* 4. Streamlit 元件美化 */
         .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
             border-radius: 0.5rem;
             border: 1px solid #e7edf3;
@@ -59,7 +59,7 @@ st.markdown("""
             background-color: #1466b8;
         }
         
-        /* 表格美化 */
+        /* 表格區塊美化 */
         div[data-testid="stDataFrame"] {
             background-color: white;
             padding: 1rem;
@@ -69,28 +69,29 @@ st.markdown("""
         }
     </style>
 
-    <div class="fixed top-0 left-0 w-full bg-white border-b border-[#e7edf3] shadow-sm mb-6" style="z-index: 99999;">
-        <div class="flex h-16 items-center justify-between px-6 lg:px-10 max-w-[1440px] mx-auto">
-            <div class="flex items-center gap-4">
-                <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-[#197fe6]/10 text-[#197fe6]">
-                    <span class="material-symbols-outlined text-[28px]">medication_liquid</span>
+    <div style="position: fixed; top: 0; left: 0; width: 100%; z-index: 999999; background-color: white; border-bottom: 1px solid #e7edf3; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">
+        <div style="display: flex; height: 4rem; align-items: center; justify-content: space-between; padding: 0 1.5rem; max-width: 1440px; margin: 0 auto;">
+            
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; background-color: rgba(25, 127, 230, 0.1); color: #197fe6;">
+                    <span class="material-symbols-outlined" style="font-size: 28px;">medication_liquid</span>
                 </div>
-                <h1 class="text-xl font-bold tracking-tight text-[#0e141b]">慢箋提醒管理</h1>
+                <h1 style="font-size: 1.25rem; font-weight: 700; color: #0e141b; margin: 0;">慢箋提醒管理</h1>
             </div>
             
-            <nav class="flex items-center gap-8">
-                <span class="text-sm font-bold text-[#197fe6] cursor-pointer hover:opacity-80">個案管理</span>
-                <span class="text-sm font-medium text-[#4e7397] hover:text-[#197fe6] transition-colors cursor-pointer">領藥排程</span>
-                <span class="text-sm font-medium text-[#4e7397] hover:text-[#197fe6] transition-colors cursor-pointer">報表分析</span>
+            <nav style="display: flex; align-items: center; gap: 2rem;">
+                <span style="font-size: 0.875rem; font-weight: 700; color: #197fe6; cursor: pointer;">個案管理</span>
+                <span style="font-size: 0.875rem; font-weight: 500; color: #4e7397; cursor: pointer;">領藥排程</span>
+                <span style="font-size: 0.875rem; font-weight: 500; color: #4e7397; cursor: pointer;">報表分析</span>
             </nav>
             
-            <div class="flex items-center gap-4">
-                <div class="flex items-center gap-3 pl-2 border-l border-[#e7edf3]">
-                    <div class="text-right hidden sm:block">
-                        <p class="text-sm font-bold text-[#0e141b]">管理員</p>
-                        <p class="text-xs text-[#4e7397]">線上藥師</p>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; padding-left: 0.75rem; border-left: 1px solid #e7edf3;">
+                    <div style="text-align: right; display: block;">
+                        <p style="font-size: 0.875rem; font-weight: 700; color: #0e141b; margin: 0;">管理員</p>
+                        <p style="font-size: 0.75rem; color: #4e7397; margin: 0;">線上藥師</p>
                     </div>
-                    <div class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
+                    <div style="width: 2.25rem; height: 2.25rem; border-radius: 9999px; background-color: #e5e7eb; display: flex; align-items: center; justify-content: center; color: #6b7280;">
                         <span class="material-symbols-outlined">person</span>
                     </div>
                 </div>
