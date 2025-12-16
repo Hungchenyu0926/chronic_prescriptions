@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
 
 # ==========================================
-# 1. 頁面設定與 CSS 注入 (UI 魔改核心)
+# 1. 頁面設定與 CSS 注入
 # ==========================================
 st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layout="wide")
 
@@ -18,13 +18,13 @@ st.markdown("""
         /* 全域字體設定 */
         html, body, [class*="css"] {
             font-family: 'Inter', 'Noto Sans TC', sans-serif;
-            background-color: #f6f7f8; /* 背景色 */
+            background-color: #f6f7f8;
         }
         
         /* 隱藏 Streamlit 預設的頂部選單與 Footer */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;} /* 隱藏 Streamlit 預設 Header */
+        header {visibility: hidden;} 
         
         /* 調整主區塊 Padding，讓自定義 Header 貼頂 */
         .block-container {
@@ -33,20 +33,16 @@ st.markdown("""
             max-width: 1440px;
         }
 
-        /* ---------------------------------- */
-        /* 魔改 Streamlit 原生元件樣式 */
-        /* ---------------------------------- */
-        
         /* 輸入框樣式優化 */
         .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
-            border-radius: 0.5rem; /* rounded-lg */
+            border-radius: 0.5rem;
             border: 1px solid #e7edf3;
             background-color: white;
             color: #0e141b;
             padding: 0.5rem;
         }
         
-        /* 按鈕樣式 (Primary Button) */
+        /* 按鈕樣式 */
         .stButton button[kind="primary"] {
             background-color: #197fe6;
             border: none;
@@ -58,19 +54,6 @@ st.markdown("""
         }
         .stButton button[kind="primary"]:hover {
             background-color: #1466b8;
-        }
-
-        /* Expander (摺疊區塊) 樣式 */
-        .streamlit-expanderHeader {
-            background-color: white;
-            border-radius: 0.5rem;
-            border: 1px solid #e7edf3;
-        }
-        
-        /* 調整 Metric (指標) 樣式 */
-        div[data-testid="stMetricValue"] {
-            font-size: 1.5rem;
-            color: #197fe6;
         }
 
         /* 表格區塊背景 */
@@ -85,10 +68,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 自定義 Header (使用您提供的 HTML)
+# 2. 自定義 Header (UI 修正版)
 # ==========================================
+# 修改重點：
+# 1. z-index 提高到 z-[9999] 避免被遮擋
+# 2. 移除 hidden md:flex 改為 flex，確保手機版也能看到選單
 st.markdown("""
-<div class="fixed top-0 left-0 w-full z-50 bg-white border-b border-[#e7edf3] shadow-sm mb-6">
+<div class="fixed top-0 left-0 w-full z-[9999] bg-white border-b border-[#e7edf3] shadow-sm mb-6">
     <div class="flex h-16 items-center justify-between px-6 lg:px-10 max-w-[1440px] mx-auto">
         <div class="flex items-center gap-4">
             <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-[#197fe6]/10 text-[#197fe6]">
@@ -97,7 +83,7 @@ st.markdown("""
             <h1 class="text-xl font-bold tracking-tight text-[#0e141b]">慢箋提醒管理</h1>
         </div>
         
-        <nav class="hidden md:flex items-center gap-8">
+        <nav class="flex items-center gap-8">
             <span class="text-sm font-bold text-[#197fe6] cursor-pointer">個案管理</span>
             <span class="text-sm font-medium text-[#4e7397] hover:text-[#197fe6] transition-colors cursor-pointer">領藥排程</span>
             <span class="text-sm font-medium text-[#4e7397] hover:text-[#197fe6] transition-colors cursor-pointer">報表分析</span>
@@ -120,7 +106,7 @@ st.markdown("""
 
 
 # ==========================================
-# 3. 核心邏輯 (Python Backend) - 保持不變
+# 3. 核心邏輯 (Python Backend)
 # ==========================================
 
 def calculate_age(born):
@@ -207,18 +193,14 @@ if 'df' not in st.session_state:
 # 4. 主內容區域 (Main Content)
 # ==========================================
 
-# --- 標題與匯出區塊 ---
 col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
     st.markdown("""
         <h2 class="text-3xl font-black text-[#0e141b] tracking-tight mb-2">個案管理儀表板</h2>
         <p class="text-[#4e7397] text-base mb-6">管理慢性病連續處方箋個案資料與自動計算領藥提醒</p>
     """, unsafe_allow_html=True)
-with col_head2:
-    # 這裡放一個隱形佔位，或者未來可放匯出按鈕功能
-    pass
 
-# --- 新增個案表單 (移植到主畫面，模擬設計圖的 Card 樣式) ---
+# --- 新增個案表單 ---
 st.markdown("""
 <div class="bg-white rounded-xl border border-[#e7edf3] shadow-sm overflow-hidden mb-8">
     <div class="px-6 py-4 border-b border-[#e7edf3] flex items-center gap-2 bg-gray-50/50">
@@ -228,12 +210,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# 使用 Streamlit Form 包裹，並插入到上方的視覺容器中 (利用視覺錯位)
-# 為了讓 Form 看起來在 Card 裡面，我們不使用原生 Form 邊框，而是透過上面的 HTML 畫頭
 with st.container():
     with st.form("add_patient_form", border=True): 
-        # 使用 border=True 讓 Streamlit 自帶一個邊框，搭配 CSS 微調
-        
         c1, c2, c3 = st.columns(3)
         with c1:
             name = st.text_input("個案姓名", placeholder="請輸入姓名")
@@ -245,7 +223,6 @@ with st.container():
             gender = st.selectbox("性別", ["男", "女"])
             duration = st.selectbox("處方箋週期", [28, 30], index=0)
 
-        # 送出按鈕區塊
         st.markdown("<br>", unsafe_allow_html=True)
         col_submit_L, col_submit_R = st.columns([4, 1])
         with col_submit_R:
@@ -264,7 +241,6 @@ with st.container():
             st.rerun()
 
 # --- 資料列表區塊 ---
-
 st.markdown("""
 <div class="bg-white rounded-t-xl border-t border-l border-r border-[#e7edf3] shadow-sm mt-8">
     <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/50 border-b border-[#e7edf3]">
@@ -279,7 +255,6 @@ st.markdown("""
 if not st.session_state.df.empty:
     display_df = st.session_state.df.copy()
     
-    # 計算邏輯
     display_df['年齡'] = display_df['出生年月日'].apply(calculate_age)
     display_df['第一次領藥日'] = pd.to_datetime(display_df['第一次領藥日']).dt.date
     date_calculations = display_df.apply(lambda row: calculate_dates(row['第一次領藥日'], row['處方天數']), axis=1)
@@ -287,11 +262,8 @@ if not st.session_state.df.empty:
     display_df = display_df.reset_index(drop=True)
     dates_df = dates_df.reset_index(drop=True)
     display_df = pd.concat([display_df, dates_df], axis=1)
-    
-    # 狀態判斷
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
-    # 顯示編輯器
     edited_df = st.data_editor(
         display_df,
         column_config={
@@ -306,7 +278,6 @@ if not st.session_state.df.empty:
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("回診日", format="YYYY/MM/DD"),
-            # 隱藏不需要直接顯示的欄位
             "出生年月日": None, "處方天數": None
         },
         disabled=["個案姓名", "年齡", "性別", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
@@ -315,7 +286,6 @@ if not st.session_state.df.empty:
         height=500
     )
 
-    # 檢查並儲存更動
     cols_to_check = ['已領第二次', '已領第三次']
     original_check = st.session_state.df[cols_to_check].fillna(False).reset_index(drop=True)
     new_check = edited_df[cols_to_check].fillna(False).reset_index(drop=True)
@@ -326,7 +296,6 @@ if not st.session_state.df.empty:
         save_data(st.session_state.df)
         st.rerun()
 
-    # --- 刪除與管理區塊 (整合在表格下方) ---
     st.markdown("<div class='mt-4'></div>", unsafe_allow_html=True)
     with st.expander("🗑️ 進階管理：刪除個案"):
         col_del_1, col_del_2 = st.columns([4, 1])
