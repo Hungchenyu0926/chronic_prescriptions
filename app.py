@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
+import textwrap
 
 # ==========================================
 # 1. 頁面基本設定
@@ -11,8 +12,7 @@ st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layo
 # ==========================================
 # 2. UI 風格設定 (CSS)
 # ==========================================
-# 將 CSS 與 HTML 分開處理，確保樣式載入正常
-st.markdown("""
+css_code = textwrap.dedent("""
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
@@ -32,7 +32,7 @@ st.markdown("""
         
         /* 調整頂部間距 */
         .block-container {
-            padding-top: 2rem !important;
+            padding-top: 1rem !important;
             padding-bottom: 5rem !important;
             max-width: 1440px;
         }
@@ -69,61 +69,43 @@ st.markdown("""
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
     </style>
-""", unsafe_allow_html=True)
-
+""")
+st.markdown(css_code, unsafe_allow_html=True)
 
 # ==========================================
-# 3. 自定義簡潔標題 (Header) - 修正版本
+# 3. 自定義簡潔標題 (Header)
 # ==========================================
-
-# 修正：確保所有 HTML 標籤正確閉合
-header_html = """<div style="
-background-color: white; 
-border-bottom: 1px solid #e7edf3; 
-padding: 1.5rem 2rem; 
-margin-bottom: 2rem; 
-border-radius: 0.5rem;
-box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-display: flex;
-align-items: center;
-gap: 1rem;
+header_html = textwrap.dedent("""
+<div style="
+    background-color: white; 
+    border-bottom: 1px solid #e7edf3; 
+    padding: 1.5rem 2rem; 
+    margin-bottom: 2rem; 
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 ">
-  <div style="
-  width: 3.5rem; 
-  height: 3.5rem; 
-  background-color: rgba(25, 127, 230, 0.1); 
-  border-radius: 0.5rem; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center;
-  color: #197fe6;
-  ">
-    <span class="material-symbols-outlined" style="font-size: 36px;">
-      medication_liquid
-    </span>
-  </div>
-
-  <div>
-    <h1 style="
-    font-size: 1.75rem; 
-    font-weight: 800; 
-    color: #0e141b; 
-    margin: 0; 
-    line-height: 1.2;
+    <div style="
+        width: 3.5rem; 
+        height: 3.5rem; 
+        background-color: rgba(25, 127, 230, 0.1); 
+        border-radius: 0.5rem; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        color: #197fe6;
     ">
-      慢箋提醒管理系統
-    </h1>
-    <p style="
-    font-size: 0.95rem; 
-    color: #4e7397; 
-    margin: 0;
-    ">
-      自動計算領藥區間與回診提醒
-    </p>
-  </div>
-</div>"""
-
-# 渲染標題
+        <span class="material-symbols-outlined" style="font-size: 36px;">medication_liquid</span>
+    </div>
+    
+    <div>
+        <h1 style="font-size: 1.75rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
+        <p style="font-size: 0.95rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
+    </div>
+</div>
+""")
 st.markdown(header_html, unsafe_allow_html=True)
 
 
@@ -157,6 +139,10 @@ def calculate_dates(start_date, duration):
 
 def check_status(row):
     """判斷目前的狀態並給予提醒標籤"""
+    # 如果已結案，直接回傳完成狀態
+    if row.get('已結案', False):
+        return "🏁 已結案"
+
     if pd.isna(row['第一次領藥日']): return "資料不全"
     today = date.today()
     
@@ -188,13 +174,38 @@ def load_data():
     conn = st.connection("gsheets", type=GSheetsConnection)
     try:
         df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
+        
+        # 定義完整欄位結構
+        required_columns = [
+            '個案姓名', '個案電話', '出生年月日', '性別', 
+            '第一次領藥日', '處方天數', '居住里別', 
+            '已領第二次', '已領第三次', '已結案'
+        ]
+        
         if df.empty:
-            return pd.DataFrame(columns=['個案姓名', '出生年月日', '性別', '第一次領藥日', '處方天數', '居住里別', '已領第二次', '已領第三次'])
+            return pd.DataFrame(columns=required_columns)
+            
+        # 確保所有欄位都存在 (若 Google Sheet 缺欄位，自動補上)
+        for col in required_columns:
+            if col not in df.columns:
+                if col in ['已領第二次', '已領第三次', '已結案']:
+                    df[col] = False
+                else:
+                    df[col] = ""
+
+        # 格式轉換
         date_cols = ['出生年月日', '第一次領藥日']
         for col in date_cols:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
-        df['已領第二次'] = df['已領第二次'].fillna(False).astype(bool)
-        df['已領第三次'] = df['已領第三次'].fillna(False).astype(bool)
+            
+        # 布林值轉換
+        bool_cols = ['已領第二次', '已領第三次', '已結案']
+        for col in bool_cols:
+            df[col] = df[col].fillna(False).astype(bool)
+            
+        # 電話轉字串 (避免數字開頭0被吃掉)
+        df['個案電話'] = df['個案電話'].astype(str).replace('nan', '')
+
         return df
     except Exception as e:
         st.error(f"讀取資料失敗: {e}")
@@ -216,29 +227,33 @@ if 'df' not in st.session_state:
 # ==========================================
 
 # --- 新增個案表單 (標題) ---
-# 使用 HTML 來渲染表單的標題區塊，確保與上方風格一致
-st.markdown("""
+form_header_html = textwrap.dedent("""
 <div style="background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; margin-bottom: -1px;">
     <span class="material-symbols-outlined" style="color: #197fe6;">person_add</span>
     <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">新增個案資料</span>
 </div>
-""", unsafe_allow_html=True)
+""")
+st.markdown(form_header_html, unsafe_allow_html=True)
 
 # --- 新增個案表單 (內容) ---
-# 使用 Streamlit Form
 with st.container():
-    # 增加一個外層的 div 來模擬卡片邊框的下半部 (透過 CSS 影響 stForm)
     with st.form("add_patient_form", border=True): 
+        # 修改版面配置以容納電話欄位
         c1, c2, c3 = st.columns(3)
         with c1:
             name = st.text_input("個案姓名", placeholder="請輸入姓名")
-            district = st.text_input("居住里別", placeholder="例如：大安里")
+            phone = st.text_input("個案電話", placeholder="例如：0912-345678")
         with c2:
             dob = st.date_input("出生年月日", min_value=date(1900, 1, 1), max_value=date.today(), value=date(2025, 1, 1))
-            first_date = st.date_input("第一次領藥日期", value=date.today())
+            district = st.text_input("居住里別", placeholder="例如：大安里")
         with c3:
-            gender = st.selectbox("性別", ["男", "女"])
-            duration = st.selectbox("處方箋週期", [28, 30], index=0)
+            # 第一行放性別和週期
+            r1_c1, r1_c2 = st.columns(2)
+            with r1_c1: gender = st.selectbox("性別", ["男", "女"])
+            with r1_c2: duration = st.selectbox("處方箋週期", [28, 30], index=0)
+            
+            # 第二行放日期
+            first_date = st.date_input("第一次領藥日期", value=date.today())
 
         st.markdown("<br>", unsafe_allow_html=True)
         col_submit_L, col_submit_R = st.columns([4, 1])
@@ -247,9 +262,16 @@ with st.container():
 
         if submitted and name:
             new_data = {
-                '個案姓名': name, '出生年月日': dob, '性別': gender,
-                '第一次領藥日': first_date, '處方天數': duration,
-                '居住里別': district, '已領第二次': False, '已領第三次': False
+                '個案姓名': name, 
+                '個案電話': phone,
+                '出生年月日': dob, 
+                '性別': gender,
+                '第一次領藥日': first_date, 
+                '處方天數': duration,
+                '居住里別': district, 
+                '已領第二次': False, 
+                '已領第三次': False,
+                '已結案': False
             }
             new_df = pd.DataFrame([new_data])
             st.session_state.df = pd.concat([st.session_state.df, new_df], ignore_index=True)
@@ -257,13 +279,14 @@ with st.container():
             st.success(f"已成功新增：{name}")
             st.rerun()
 
-# --- 資料列表區塊 ---
-st.markdown("""
+# --- 資料列表區塊 (標題) ---
+list_header_html = textwrap.dedent("""
 <div style="margin-top: 2rem; background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e7edf3;">
     <span class="material-symbols-outlined" style="color: #197fe6;">list_alt</span>
     <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">個案資料列表</span>
 </div>
-""", unsafe_allow_html=True)
+""")
+st.markdown(list_header_html, unsafe_allow_html=True)
 
 if not st.session_state.df.empty:
     display_df = st.session_state.df.copy()
@@ -276,23 +299,28 @@ if not st.session_state.df.empty:
     display_df = display_df.reset_index(drop=True)
     dates_df = dates_df.reset_index(drop=True)
     display_df = pd.concat([display_df, dates_df], axis=1)
+    
+    # 狀態判斷
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
     # 顯示表格
     edited_df = st.data_editor(
         display_df,
         column_config={
-            "個案姓名": st.column_config.TextColumn("個案姓名", help="病患姓名", width="small"),
+            "個案姓名": st.column_config.TextColumn("個案姓名", width="small"),
+            "個案電話": st.column_config.TextColumn("電話", width="medium"),
             "年齡": st.column_config.NumberColumn("年齡", format="%d 歲", width="small"),
             "性別": st.column_config.TextColumn("性別", width="small"),
             "目前狀態": st.column_config.TextColumn("目前狀態", width="medium"),
             "已領第二次": st.column_config.CheckboxColumn("已領2次"),
             "已領第三次": st.column_config.CheckboxColumn("已領3次"),
+            "已結案": st.column_config.CheckboxColumn("已結案", help="勾選後代表案件結束"),
             "2nd_start": st.column_config.DateColumn("2次起始", format="MM/DD"),
             "2nd_end": st.column_config.DateColumn("2次結束", format="MM/DD"),
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("回診日", format="YYYY/MM/DD"),
+            # 隱藏欄位
             "出生年月日": None, "處方天數": None
         },
         disabled=["個案姓名", "年齡", "性別", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
@@ -301,14 +329,25 @@ if not st.session_state.df.empty:
         height=500
     )
 
-    # 儲存邏輯
-    cols_to_check = ['已領第二次', '已領第三次']
-    original_check = st.session_state.df[cols_to_check].fillna(False).reset_index(drop=True)
-    new_check = edited_df[cols_to_check].fillna(False).reset_index(drop=True)
+    # 儲存邏輯 (包含檢查已結案與電話的變更)
+    cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話']
+    
+    # 確保資料型態一致以利比較
+    original_check = st.session_state.df[cols_to_check].copy()
+    original_check[['已領第二次', '已領第三次', '已結案']] = original_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
+    original_check['個案電話'] = original_check['個案電話'].astype(str)
+    original_check = original_check.reset_index(drop=True)
+    
+    new_check = edited_df[cols_to_check].copy()
+    new_check[['已領第二次', '已領第三次', '已結案']] = new_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
+    new_check['個案電話'] = new_check['個案電話'].astype(str)
+    new_check = new_check.reset_index(drop=True)
     
     if not new_check.equals(original_check):
         st.session_state.df['已領第二次'] = edited_df['已領第二次']
         st.session_state.df['已領第三次'] = edited_df['已領第三次']
+        st.session_state.df['已結案'] = edited_df['已結案']
+        st.session_state.df['個案電話'] = edited_df['個案電話']
         save_data(st.session_state.df)
         st.rerun()
 
