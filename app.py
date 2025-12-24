@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
-import textwrap
 
 # ==========================================
 # 1. 頁面基本設定
@@ -12,102 +11,73 @@ st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layo
 # ==========================================
 # 2. UI 風格設定 (CSS)
 # ==========================================
-css_code = textwrap.dedent("""
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
-    
-    <style>
-        /* 全域設定 */
-        html, body, [class*="css"] {
-            font-family: 'Inter', 'Noto Sans TC', sans-serif;
-            background-color: #f6f7f8;
-        }
-        
-        /* 隱藏 Streamlit 原生 Header */
-        header[data-testid="stHeader"] { visibility: hidden; }
-        .stAppHeader { visibility: hidden; }
-        #MainMenu { visibility: hidden; }
-        footer { visibility: hidden; }
-        
-        /* 調整頂部間距 */
-        .block-container {
-            padding-top: 1rem !important;
-            padding-bottom: 5rem !important;
-            max-width: 1440px;
-        }
-
-        /* 輸入框美化 */
-        .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
-            border-radius: 0.5rem;
-            border: 1px solid #e7edf3;
-            background-color: white;
-            color: #0e141b;
-            padding: 0.5rem;
-        }
-        
-        /* 按鈕美化 */
-        .stButton button[kind="primary"] {
-            background-color: #197fe6;
-            border: none;
-            color: white;
-            border-radius: 0.5rem;
-            padding: 0.5rem 1.5rem;
-            font-weight: bold;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        .stButton button[kind="primary"]:hover {
-            background-color: #1466b8;
-        }
-        
-        /* 表格區塊美化 */
-        div[data-testid="stDataFrame"] {
-            background-color: white;
-            padding: 1rem;
-            border-radius: 0.75rem;
-            border: 1px solid #e7edf3;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-    </style>
-""")
-st.markdown(css_code, unsafe_allow_html=True)
+# 修正重點：字串內容全部靠左，不留任何空格，避免被誤判為程式碼
+st.markdown("""<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<style>
+    /* 全域設定 */
+    html, body, [class*="css"] {
+        font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        background-color: #f6f7f8;
+    }
+    /* 隱藏 Streamlit 原生 Header */
+    header[data-testid="stHeader"] { visibility: hidden; }
+    .stAppHeader { visibility: hidden; }
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    /* 調整頂部間距 */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 5rem !important;
+        max-width: 1440px;
+    }
+    /* 輸入框美化 */
+    .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
+        border-radius: 0.5rem;
+        border: 1px solid #e7edf3;
+        background-color: white;
+        color: #0e141b;
+        padding: 0.5rem;
+    }
+    /* 按鈕美化 */
+    .stButton button[kind="primary"] {
+        background-color: #197fe6;
+        border: none;
+        color: white;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1.5rem;
+        font-weight: bold;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .stButton button[kind="primary"]:hover {
+        background-color: #1466b8;
+    }
+    /* 表格區塊美化 */
+    div[data-testid="stDataFrame"] {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid #e7edf3;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ==========================================
 # 3. 自定義簡潔標題 (Header)
 # ==========================================
-header_html = textwrap.dedent("""
-<div style="
-    background-color: white; 
-    border-bottom: 1px solid #e7edf3; 
-    padding: 1.5rem 2rem; 
-    margin-bottom: 2rem; 
-    border-radius: 0.5rem;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-">
-    <div style="
-        width: 3.5rem; 
-        height: 3.5rem; 
-        background-color: rgba(25, 127, 230, 0.1); 
-        border-radius: 0.5rem; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center;
-        color: #197fe6;
-    ">
+# 修正重點：HTML 標籤緊貼左側
+st.markdown("""<div style="background-color: white; border-bottom: 1px solid #e7edf3; padding: 1.5rem 2rem; margin-bottom: 2rem; border-radius: 0.5rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 1rem;">
+    <div style="width: 3.5rem; height: 3.5rem; background-color: rgba(25, 127, 230, 0.1); border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #197fe6;">
         <span class="material-symbols-outlined" style="font-size: 36px;">medication_liquid</span>
     </div>
-    
     <div>
         <h1 style="font-size: 1.75rem; font-weight: 800; color: #0e141b; margin: 0; line-height: 1.2;">慢箋提醒管理系統</h1>
         <p style="font-size: 0.95rem; color: #4e7397; margin: 0;">自動計算領藥區間與回診提醒</p>
     </div>
 </div>
-""")
-st.markdown(header_html, unsafe_allow_html=True)
-
+""", unsafe_allow_html=True)
 
 # ==========================================
 # 4. 核心邏輯 (Backend Logic)
@@ -139,7 +109,7 @@ def calculate_dates(start_date, duration):
 
 def check_status(row):
     """判斷目前的狀態並給予提醒標籤"""
-    # 如果已結案，直接回傳完成狀態
+    # 優先檢查是否已結案
     if row.get('已結案', False):
         return "🏁 已結案"
 
@@ -175,7 +145,7 @@ def load_data():
     try:
         df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
         
-        # 定義完整欄位結構
+        # 完整的欄位定義 (包含電話與已結案)
         required_columns = [
             '個案姓名', '個案電話', '出生年月日', '性別', 
             '第一次領藥日', '處方天數', '居住里別', 
@@ -185,7 +155,7 @@ def load_data():
         if df.empty:
             return pd.DataFrame(columns=required_columns)
             
-        # 確保所有欄位都存在 (若 Google Sheet 缺欄位，自動補上)
+        # 自動補齊缺失欄位
         for col in required_columns:
             if col not in df.columns:
                 if col in ['已領第二次', '已領第三次', '已結案']:
@@ -198,12 +168,10 @@ def load_data():
         for col in date_cols:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
             
-        # 布林值轉換
         bool_cols = ['已領第二次', '已領第三次', '已結案']
         for col in bool_cols:
             df[col] = df[col].fillna(False).astype(bool)
             
-        # 電話轉字串 (避免數字開頭0被吃掉)
         df['個案電話'] = df['個案電話'].astype(str).replace('nan', '')
 
         return df
@@ -227,18 +195,14 @@ if 'df' not in st.session_state:
 # ==========================================
 
 # --- 新增個案表單 (標題) ---
-form_header_html = textwrap.dedent("""
-<div style="background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; margin-bottom: -1px;">
+st.markdown("""<div style="background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; margin-bottom: -1px;">
     <span class="material-symbols-outlined" style="color: #197fe6;">person_add</span>
     <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">新增個案資料</span>
-</div>
-""")
-st.markdown(form_header_html, unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 # --- 新增個案表單 (內容) ---
 with st.container():
     with st.form("add_patient_form", border=True): 
-        # 修改版面配置以容納電話欄位
         c1, c2, c3 = st.columns(3)
         with c1:
             name = st.text_input("個案姓名", placeholder="請輸入姓名")
@@ -247,12 +211,9 @@ with st.container():
             dob = st.date_input("出生年月日", min_value=date(1900, 1, 1), max_value=date.today(), value=date(2025, 1, 1))
             district = st.text_input("居住里別", placeholder="例如：大安里")
         with c3:
-            # 第一行放性別和週期
             r1_c1, r1_c2 = st.columns(2)
             with r1_c1: gender = st.selectbox("性別", ["男", "女"])
             with r1_c2: duration = st.selectbox("處方箋週期", [28, 30], index=0)
-            
-            # 第二行放日期
             first_date = st.date_input("第一次領藥日期", value=date.today())
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -280,13 +241,10 @@ with st.container():
             st.rerun()
 
 # --- 資料列表區塊 (標題) ---
-list_header_html = textwrap.dedent("""
-<div style="margin-top: 2rem; background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e7edf3;">
+st.markdown("""<div style="margin-top: 2rem; background-color: white; border: 1px solid #e7edf3; border-radius: 10px 10px 0 0; padding: 15px 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e7edf3;">
     <span class="material-symbols-outlined" style="color: #197fe6;">list_alt</span>
     <span style="font-weight: 700; color: #0e141b; font-size: 1.125rem;">個案資料列表</span>
-</div>
-""")
-st.markdown(list_header_html, unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
 if not st.session_state.df.empty:
     display_df = st.session_state.df.copy()
@@ -299,11 +257,9 @@ if not st.session_state.df.empty:
     display_df = display_df.reset_index(drop=True)
     dates_df = dates_df.reset_index(drop=True)
     display_df = pd.concat([display_df, dates_df], axis=1)
-    
-    # 狀態判斷
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
-    # 顯示表格
+    # 顯示表格 (包含電話與已結案)
     edited_df = st.data_editor(
         display_df,
         column_config={
@@ -314,13 +270,12 @@ if not st.session_state.df.empty:
             "目前狀態": st.column_config.TextColumn("目前狀態", width="medium"),
             "已領第二次": st.column_config.CheckboxColumn("已領2次"),
             "已領第三次": st.column_config.CheckboxColumn("已領3次"),
-            "已結案": st.column_config.CheckboxColumn("已結案", help="勾選後代表案件結束"),
+            "已結案": st.column_config.CheckboxColumn("已結案", help="勾選後結案"),
             "2nd_start": st.column_config.DateColumn("2次起始", format="MM/DD"),
             "2nd_end": st.column_config.DateColumn("2次結束", format="MM/DD"),
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("回診日", format="YYYY/MM/DD"),
-            # 隱藏欄位
             "出生年月日": None, "處方天數": None
         },
         disabled=["個案姓名", "年齡", "性別", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
@@ -329,10 +284,8 @@ if not st.session_state.df.empty:
         height=500
     )
 
-    # 儲存邏輯 (包含檢查已結案與電話的變更)
+    # 儲存邏輯
     cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話']
-    
-    # 確保資料型態一致以利比較
     original_check = st.session_state.df[cols_to_check].copy()
     original_check[['已領第二次', '已領第三次', '已結案']] = original_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
     original_check['個案電話'] = original_check['個案電話'].astype(str)
