@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
 import textwrap
-# 👇 新增 LINE SDK
 from linebot import LineBotApi
 from linebot.models import TextSendMessage
 from linebot.exceptions import LineBotApiError
@@ -20,20 +19,12 @@ st.markdown("""<script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <style>
-    /* 全域設定 */
-    html, body, [class*="css"] {
-        font-family: 'Inter', 'Noto Sans TC', sans-serif;
-        background-color: #f6f7f8;
-    }
+    html, body, [class*="css"] { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f6f7f8; }
     header[data-testid="stHeader"] { visibility: hidden; }
     .stAppHeader { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 5rem !important;
-        max-width: 1440px;
-    }
+    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 1440px; }
     .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
         border-radius: 0.5rem; border: 1px solid #e7edf3; background-color: white; color: #0e141b; padding: 0.5rem;
     }
@@ -97,14 +88,14 @@ def check_status(row):
         remind_start = row['2nd_start'] - timedelta(days=7)
         if remind_start <= today <= row['2nd_end']:
             if today < row['2nd_start']: return "⚠️ 即將進入第二次領藥期"
-            return "🔴 請領取第二次藥物" # Key for notification
+            return "🔴 請領取第二次藥物"
         elif today > row['2nd_end']: return "❌ 第二次領藥已過期"
 
     if not row['已領第三次']:
         remind_start = row['3rd_start'] - timedelta(days=7)
         if remind_start <= today <= row['3rd_end']:
             if today < row['3rd_start']: return "⚠️ 即將進入第三次領藥期"
-            return "🔴 請領取第三次藥物" # Key for notification
+            return "🔴 請領取第三次藥物"
         elif today > row['3rd_end'] and row['已領第二次']: return "❌ 第三次領藥已過期"
              
     if row['已領第二次'] and row['已領第三次']:
@@ -112,31 +103,24 @@ def check_status(row):
         return "✅ 完成領藥"
     return "🔵 一般追蹤中"
 
-# --- LINE 推播函數 ---
-def send_line_push(user_id, message_text):
+# --- LINE 推播函數 (改為發送給管理員) ---
+def send_admin_notification(message_text):
     """
-    發送 LINE 訊息給特定 User ID
-    需要 Secrets 設定: [line_bot] channel_access_token
+    發送彙整訊息給管理員 (Admin)
+    需要 Secrets 設定: [line_bot] channel_access_token, admin_user_id
     """
-    if not user_id or len(user_id) < 10: # 簡單過濾無效 ID
-        return False, "無效的 User ID"
-        
     try:
-        # 從 Secrets 讀取 Token
         token = st.secrets["line_bot"]["channel_access_token"]
-        line_bot_api = LineBotApi(token)
+        # 讀取管理員 ID
+        admin_id = st.secrets["line_bot"]["admin_user_id"] 
         
-        line_bot_api.push_message(
-            user_id, 
-            TextSendMessage(text=message_text)
-        )
+        line_bot_api = LineBotApi(token)
+        line_bot_api.push_message(admin_id, TextSendMessage(text=message_text))
         return True, "發送成功"
     except KeyError:
-        return False, "未設定 Secrets Token"
-    except LineBotApiError as e:
-        return False, f"LINE API 錯誤: {e.message}"
+        return False, "Secrets 設定不完整 (缺 token 或 admin_user_id)"
     except Exception as e:
-        return False, f"未預期錯誤: {e}"
+        return False, f"發送失敗: {e}"
 
 # Google Sheets 連線
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Qu_f2aStXeasb4yW4GsSWTURUnXrIexFSoaDZ13CBME/edit?hl=zh-TW&gid=0#gid=0"
@@ -146,9 +130,9 @@ def load_data():
     try:
         df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
         
-        # 新增 LINE_ID 欄位
+        # 移除了 LINE_ID，只保留基本資料
         required_columns = [
-            '個案姓名', '個案電話', 'LINE_ID', '出生年月日', '性別', 
+            '個案姓名', '個案電話', '出生年月日', '性別', 
             '第一次領藥日', '處方天數', '居住里別', 
             '已領第二次', '已領第三次', '已結案'
         ]
@@ -172,7 +156,6 @@ def load_data():
             df[col] = df[col].fillna(False).astype(bool)
             
         df['個案電話'] = df['個案電話'].astype(str).replace('nan', '')
-        df['LINE_ID'] = df['LINE_ID'].astype(str).replace('nan', '') # 確保 LINE ID 是字串
 
         return df
     except Exception as e:
@@ -207,7 +190,7 @@ with st.container():
         with c1:
             name = st.text_input("個案姓名", placeholder="請輸入姓名")
             phone = st.text_input("個案電話", placeholder="例如：0912-345678")
-            line_id = st.text_input("LINE User ID", placeholder="需填寫 U 開頭的 ID 才能推播")
+            # 移除 LINE ID 輸入框
         with c2:
             dob = st.date_input("出生年月日", min_value=date(1900, 1, 1), max_value=date.today(), value=date(2025, 1, 1))
             district = st.text_input("居住里別", placeholder="例如：大安里")
@@ -224,7 +207,7 @@ with st.container():
 
         if submitted and name:
             new_data = {
-                '個案姓名': name, '個案電話': phone, 'LINE_ID': line_id,
+                '個案姓名': name, '個案電話': phone,
                 '出生年月日': dob, '性別': gender,
                 '第一次領藥日': first_date, '處方天數': duration,
                 '居住里別': district, 
@@ -255,12 +238,11 @@ if not st.session_state.df.empty:
     display_df = pd.concat([display_df, dates_df], axis=1)
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
-    # 顯示表格
+    # 顯示表格 (移除 LINE ID)
     edited_df = st.data_editor(
         display_df,
         column_config={
             "個案姓名": st.column_config.TextColumn("個案姓名", width="small"),
-            "LINE_ID": st.column_config.TextColumn("LINE ID", width="small", help="填入 U 開頭代碼"),
             "個案電話": st.column_config.TextColumn("電話", width="medium"),
             "目前狀態": st.column_config.TextColumn("目前狀態", width="medium"),
             "已領第二次": st.column_config.CheckboxColumn("已領2次"),
@@ -271,7 +253,7 @@ if not st.session_state.df.empty:
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("回診日", format="YYYY/MM/DD"),
-            "出生年月日": None, "處方天數": None, "性別": None, "年齡": None # 隱藏部分欄位節省空間
+            "出生年月日": None, "處方天數": None, "性別": None, "年齡": None
         },
         disabled=["個案姓名", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
         use_container_width=True,
@@ -280,71 +262,63 @@ if not st.session_state.df.empty:
     )
 
     # 儲存邏輯
-    cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話', 'LINE_ID']
+    cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話']
     original_check = st.session_state.df[cols_to_check].copy()
     original_check[['已領第二次', '已領第三次', '已結案']] = original_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
     original_check['個案電話'] = original_check['個案電話'].astype(str)
-    original_check['LINE_ID'] = original_check['LINE_ID'].astype(str)
     original_check = original_check.reset_index(drop=True)
     
     new_check = edited_df[cols_to_check].copy()
     new_check[['已領第二次', '已領第三次', '已結案']] = new_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
     new_check['個案電話'] = new_check['個案電話'].astype(str)
-    new_check['LINE_ID'] = new_check['LINE_ID'].astype(str)
     new_check = new_check.reset_index(drop=True)
     
     if not new_check.equals(original_check):
-        st.session_state.df.update(edited_df) # 更新所有欄位
+        st.session_state.df.update(edited_df)
         save_data(st.session_state.df)
         st.rerun()
 
-    # --- LINE 推播功能區塊 ---
+    # --- LINE 推播功能區塊 (給藥師) ---
     st.markdown("<div class='mt-6'></div>", unsafe_allow_html=True)
     
-    # 篩選出需要通知的人 (狀態含 "🔴") 且有填寫 LINE ID 的人
+    # 篩選出需要通知的人 (紅燈 + 未結案)
     notify_list = display_df[
         (display_df['目前狀態'].str.contains("🔴", na=False)) & 
-        (display_df['LINE_ID'].str.len() > 10) & 
         (~display_df['已結案'])
     ]
 
-    with st.expander("📲 LINE 推播通知中心", expanded=True):
+    with st.expander("📲 LINE 通知小幫手", expanded=True):
         col_line_1, col_line_2 = st.columns([3, 1])
         
         with col_line_1:
-            st.write(f"目前共有 **{len(notify_list)}** 位個案符合「需領藥」且「有 LINE ID」。")
+            st.write(f"系統偵測：目前共有 **{len(notify_list)}** 位個案需要領藥。")
             if not notify_list.empty:
-                st.dataframe(notify_list[['個案姓名', 'LINE_ID', '目前狀態', '2nd_end', '3rd_end']], hide_index=True)
+                # 簡單顯示名單預覽
+                st.dataframe(notify_list[['個案姓名', '個案電話', '目前狀態', '2nd_end', '3rd_end']], hide_index=True)
         
         with col_line_2:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🚀 發送 LINE 提醒", type="primary", use_container_width=True, disabled=notify_list.empty):
-                success_count = 0
-                fail_count = 0
+            # 按鈕：傳送給自己
+            if st.button("🚀 發送彙整名單給藥師 (我)", type="primary", use_container_width=True, disabled=notify_list.empty):
                 
-                progress_bar = st.progress(0)
+                # 組合彙整訊息
+                current_date = date.today().strftime("%Y/%m/%d")
+                msg_body = f"【慢箋領藥提醒彙整】\n日期：{current_date}\n\n以下個案需通知領藥：\n"
                 
                 for idx, row in enumerate(notify_list.iterrows()):
                     patient = row[1]
-                    # 組合訊息
-                    msg = (
-                        f"【慢箋領藥提醒】\n"
-                        f"{patient['個案姓名']} 您好，\n"
-                        f"系統偵測您目前的狀態為：{patient['目前狀態']}。\n"
-                        f"請記得在期限前攜帶健保卡與處方箋前往藥局領藥。\n"
-                        f"如有疑問請聯繫藥師。"
-                    )
-                    
-                    is_sent, log = send_line_push(patient['LINE_ID'], msg)
-                    if is_sent:
-                        success_count += 1
-                    else:
-                        fail_count += 1
-                        st.error(f"{patient['個案姓名']} 發送失敗: {log}")
-                    
-                    progress_bar.progress((idx + 1) / len(notify_list))
+                    # 抓取狀態中的關鍵字 (例如 "請領取第二次藥物")
+                    clean_status = patient['目前狀態'].replace("🔴 ", "")
+                    msg_body += f"{idx+1}. {patient['個案姓名']} ({clean_status})\n   電話: {patient['個案電話']}\n"
                 
-                st.toast(f"發送完成！成功: {success_count}, 失敗: {fail_count}", icon="✅")
+                msg_body += "\n請藥師協助聯繫個案。"
+                
+                is_sent, log = send_admin_notification(msg_body)
+                
+                if is_sent:
+                    st.toast("✅ 已成功發送至您的 LINE！", icon="🚀")
+                else:
+                    st.error(f"發送失敗: {log}")
 
     # 刪除功能
     st.markdown("<div class='mt-4'></div>", unsafe_allow_html=True)
