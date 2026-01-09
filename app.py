@@ -2,6 +2,11 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
 from streamlit_gsheets import GSheetsConnection
+import textwrap
+# 👇 新增 LINE SDK
+from linebot import LineBotApi
+from linebot.models import TextSendMessage
+from linebot.exceptions import LineBotApiError
 
 # ==========================================
 # 1. 頁面基本設定
@@ -11,7 +16,6 @@ st.set_page_config(page_title="慢箋提醒管理系統", page_icon="💊", layo
 # ==========================================
 # 2. UI 風格設定 (CSS)
 # ==========================================
-# 修正重點：字串內容全部靠左，不留任何空格，避免被誤判為程式碼
 st.markdown("""<script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
@@ -21,45 +25,25 @@ st.markdown("""<script src="https://cdn.tailwindcss.com"></script>
         font-family: 'Inter', 'Noto Sans TC', sans-serif;
         background-color: #f6f7f8;
     }
-    /* 隱藏 Streamlit 原生 Header */
     header[data-testid="stHeader"] { visibility: hidden; }
     .stAppHeader { visibility: hidden; }
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
-    /* 調整頂部間距 */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 5rem !important;
         max-width: 1440px;
     }
-    /* 輸入框美化 */
     .stTextInput input, .stDateInput input, .stSelectbox div[data-baseweb="select"] {
-        border-radius: 0.5rem;
-        border: 1px solid #e7edf3;
-        background-color: white;
-        color: #0e141b;
-        padding: 0.5rem;
+        border-radius: 0.5rem; border: 1px solid #e7edf3; background-color: white; color: #0e141b; padding: 0.5rem;
     }
-    /* 按鈕美化 */
     .stButton button[kind="primary"] {
-        background-color: #197fe6;
-        border: none;
-        color: white;
-        border-radius: 0.5rem;
-        padding: 0.5rem 1.5rem;
-        font-weight: bold;
+        background-color: #197fe6; border: none; color: white; border-radius: 0.5rem; padding: 0.5rem 1.5rem; font-weight: bold;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    .stButton button[kind="primary"]:hover {
-        background-color: #1466b8;
-    }
-    /* 表格區塊美化 */
+    .stButton button[kind="primary"]:hover { background-color: #1466b8; }
     div[data-testid="stDataFrame"] {
-        background-color: white;
-        padding: 1rem;
-        border-radius: 0.75rem;
-        border: 1px solid #e7edf3;
-        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        background-color: white; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e7edf3; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -67,7 +51,6 @@ st.markdown("""<script src="https://cdn.tailwindcss.com"></script>
 # ==========================================
 # 3. 自定義簡潔標題 (Header)
 # ==========================================
-# 修正重點：HTML 標籤緊貼左側
 st.markdown("""<div style="background-color: white; border-bottom: 1px solid #e7edf3; padding: 1.5rem 2rem; margin-bottom: 2rem; border-radius: 0.5rem; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 1rem;">
     <div style="width: 3.5rem; height: 3.5rem; background-color: rgba(25, 127, 230, 0.1); border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; color: #197fe6;">
         <span class="material-symbols-outlined" style="font-size: 36px;">medication_liquid</span>
@@ -84,13 +67,11 @@ st.markdown("""<div style="background-color: white; border-bottom: 1px solid #e7
 # ==========================================
 
 def calculate_age(born):
-    """根據出生年月日計算年齡"""
     if not born: return 0
     today = date.today()
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 def calculate_dates(start_date, duration):
-    """計算慢箋的各個關鍵日期"""
     if not start_date: return {}
     end_cycle_1 = start_date + timedelta(days=duration)
     second_start = end_cycle_1 - timedelta(days=9)
@@ -108,34 +89,54 @@ def calculate_dates(start_date, duration):
     }
 
 def check_status(row):
-    """判斷目前的狀態並給予提醒標籤"""
-    # 優先檢查是否已結案
-    if row.get('已結案', False):
-        return "🏁 已結案"
-
+    if row.get('已結案', False): return "🏁 已結案"
     if pd.isna(row['第一次領藥日']): return "資料不全"
     today = date.today()
     
-    # 檢查第二次
     if not row['已領第二次']:
         remind_start = row['2nd_start'] - timedelta(days=7)
         if remind_start <= today <= row['2nd_end']:
             if today < row['2nd_start']: return "⚠️ 即將進入第二次領藥期"
-            return "🔴 請領取第二次藥物"
+            return "🔴 請領取第二次藥物" # Key for notification
         elif today > row['2nd_end']: return "❌ 第二次領藥已過期"
 
-    # 檢查第三次
     if not row['已領第三次']:
         remind_start = row['3rd_start'] - timedelta(days=7)
         if remind_start <= today <= row['3rd_end']:
             if today < row['3rd_start']: return "⚠️ 即將進入第三次領藥期"
-            return "🔴 請領取第三次藥物"
+            return "🔴 請領取第三次藥物" # Key for notification
         elif today > row['3rd_end'] and row['已領第二次']: return "❌ 第三次領藥已過期"
              
     if row['已領第二次'] and row['已領第三次']:
         if today >= row['return_visit'] - timedelta(days=7): return "🏥 建議準備回診"
         return "✅ 完成領藥"
     return "🔵 一般追蹤中"
+
+# --- LINE 推播函數 ---
+def send_line_push(user_id, message_text):
+    """
+    發送 LINE 訊息給特定 User ID
+    需要 Secrets 設定: [line_bot] channel_access_token
+    """
+    if not user_id or len(user_id) < 10: # 簡單過濾無效 ID
+        return False, "無效的 User ID"
+        
+    try:
+        # 從 Secrets 讀取 Token
+        token = st.secrets["line_bot"]["channel_access_token"]
+        line_bot_api = LineBotApi(token)
+        
+        line_bot_api.push_message(
+            user_id, 
+            TextSendMessage(text=message_text)
+        )
+        return True, "發送成功"
+    except KeyError:
+        return False, "未設定 Secrets Token"
+    except LineBotApiError as e:
+        return False, f"LINE API 錯誤: {e.message}"
+    except Exception as e:
+        return False, f"未預期錯誤: {e}"
 
 # Google Sheets 連線
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/1Qu_f2aStXeasb4yW4GsSWTURUnXrIexFSoaDZ13CBME/edit?hl=zh-TW&gid=0#gid=0"
@@ -145,9 +146,9 @@ def load_data():
     try:
         df = conn.read(spreadsheet=SPREADSHEET_URL, worksheet="工作表1", ttl=0)
         
-        # 完整的欄位定義 (包含電話與已結案)
+        # 新增 LINE_ID 欄位
         required_columns = [
-            '個案姓名', '個案電話', '出生年月日', '性別', 
+            '個案姓名', '個案電話', 'LINE_ID', '出生年月日', '性別', 
             '第一次領藥日', '處方天數', '居住里別', 
             '已領第二次', '已領第三次', '已結案'
         ]
@@ -155,7 +156,6 @@ def load_data():
         if df.empty:
             return pd.DataFrame(columns=required_columns)
             
-        # 自動補齊缺失欄位
         for col in required_columns:
             if col not in df.columns:
                 if col in ['已領第二次', '已領第三次', '已結案']:
@@ -163,7 +163,6 @@ def load_data():
                 else:
                     df[col] = ""
 
-        # 格式轉換
         date_cols = ['出生年月日', '第一次領藥日']
         for col in date_cols:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.date
@@ -173,6 +172,7 @@ def load_data():
             df[col] = df[col].fillna(False).astype(bool)
             
         df['個案電話'] = df['個案電話'].astype(str).replace('nan', '')
+        df['LINE_ID'] = df['LINE_ID'].astype(str).replace('nan', '') # 確保 LINE ID 是字串
 
         return df
     except Exception as e:
@@ -207,6 +207,7 @@ with st.container():
         with c1:
             name = st.text_input("個案姓名", placeholder="請輸入姓名")
             phone = st.text_input("個案電話", placeholder="例如：0912-345678")
+            line_id = st.text_input("LINE User ID", placeholder="需填寫 U 開頭的 ID 才能推播")
         with c2:
             dob = st.date_input("出生年月日", min_value=date(1900, 1, 1), max_value=date.today(), value=date(2025, 1, 1))
             district = st.text_input("居住里別", placeholder="例如：大安里")
@@ -223,16 +224,11 @@ with st.container():
 
         if submitted and name:
             new_data = {
-                '個案姓名': name, 
-                '個案電話': phone,
-                '出生年月日': dob, 
-                '性別': gender,
-                '第一次領藥日': first_date, 
-                '處方天數': duration,
+                '個案姓名': name, '個案電話': phone, 'LINE_ID': line_id,
+                '出生年月日': dob, '性別': gender,
+                '第一次領藥日': first_date, '處方天數': duration,
                 '居住里別': district, 
-                '已領第二次': False, 
-                '已領第三次': False,
-                '已結案': False
+                '已領第二次': False, '已領第三次': False, '已結案': False
             }
             new_df = pd.DataFrame([new_data])
             st.session_state.df = pd.concat([st.session_state.df, new_df], ignore_index=True)
@@ -249,7 +245,7 @@ st.markdown("""<div style="margin-top: 2rem; background-color: white; border: 1p
 if not st.session_state.df.empty:
     display_df = st.session_state.df.copy()
     
-    # 運算邏輯
+    # 運算
     display_df['年齡'] = display_df['出生年月日'].apply(calculate_age)
     display_df['第一次領藥日'] = pd.to_datetime(display_df['第一次領藥日']).dt.date
     date_calculations = display_df.apply(lambda row: calculate_dates(row['第一次領藥日'], row['處方天數']), axis=1)
@@ -259,50 +255,96 @@ if not st.session_state.df.empty:
     display_df = pd.concat([display_df, dates_df], axis=1)
     display_df['目前狀態'] = display_df.apply(check_status, axis=1)
     
-    # 顯示表格 (包含電話與已結案)
+    # 顯示表格
     edited_df = st.data_editor(
         display_df,
         column_config={
             "個案姓名": st.column_config.TextColumn("個案姓名", width="small"),
+            "LINE_ID": st.column_config.TextColumn("LINE ID", width="small", help="填入 U 開頭代碼"),
             "個案電話": st.column_config.TextColumn("電話", width="medium"),
-            "年齡": st.column_config.NumberColumn("年齡", format="%d 歲", width="small"),
-            "性別": st.column_config.TextColumn("性別", width="small"),
             "目前狀態": st.column_config.TextColumn("目前狀態", width="medium"),
             "已領第二次": st.column_config.CheckboxColumn("已領2次"),
             "已領第三次": st.column_config.CheckboxColumn("已領3次"),
-            "已結案": st.column_config.CheckboxColumn("已結案", help="勾選後結案"),
+            "已結案": st.column_config.CheckboxColumn("已結案"),
             "2nd_start": st.column_config.DateColumn("2次起始", format="MM/DD"),
             "2nd_end": st.column_config.DateColumn("2次結束", format="MM/DD"),
             "3rd_start": st.column_config.DateColumn("3次起始", format="MM/DD"),
             "3rd_end": st.column_config.DateColumn("3次結束", format="MM/DD"),
             "return_visit": st.column_config.DateColumn("回診日", format="YYYY/MM/DD"),
-            "出生年月日": None, "處方天數": None
+            "出生年月日": None, "處方天數": None, "性別": None, "年齡": None # 隱藏部分欄位節省空間
         },
-        disabled=["個案姓名", "年齡", "性別", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
+        disabled=["個案姓名", "目前狀態", "2nd_start", "2nd_end", "3rd_start", "3rd_end", "return_visit"],
         use_container_width=True,
         hide_index=True,
         height=500
     )
 
     # 儲存邏輯
-    cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話']
+    cols_to_check = ['已領第二次', '已領第三次', '已結案', '個案電話', 'LINE_ID']
     original_check = st.session_state.df[cols_to_check].copy()
     original_check[['已領第二次', '已領第三次', '已結案']] = original_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
     original_check['個案電話'] = original_check['個案電話'].astype(str)
+    original_check['LINE_ID'] = original_check['LINE_ID'].astype(str)
     original_check = original_check.reset_index(drop=True)
     
     new_check = edited_df[cols_to_check].copy()
     new_check[['已領第二次', '已領第三次', '已結案']] = new_check[['已領第二次', '已領第三次', '已結案']].fillna(False)
     new_check['個案電話'] = new_check['個案電話'].astype(str)
+    new_check['LINE_ID'] = new_check['LINE_ID'].astype(str)
     new_check = new_check.reset_index(drop=True)
     
     if not new_check.equals(original_check):
-        st.session_state.df['已領第二次'] = edited_df['已領第二次']
-        st.session_state.df['已領第三次'] = edited_df['已領第三次']
-        st.session_state.df['已結案'] = edited_df['已結案']
-        st.session_state.df['個案電話'] = edited_df['個案電話']
+        st.session_state.df.update(edited_df) # 更新所有欄位
         save_data(st.session_state.df)
         st.rerun()
+
+    # --- LINE 推播功能區塊 ---
+    st.markdown("<div class='mt-6'></div>", unsafe_allow_html=True)
+    
+    # 篩選出需要通知的人 (狀態含 "🔴") 且有填寫 LINE ID 的人
+    notify_list = display_df[
+        (display_df['目前狀態'].str.contains("🔴", na=False)) & 
+        (display_df['LINE_ID'].str.len() > 10) & 
+        (~display_df['已結案'])
+    ]
+
+    with st.expander("📲 LINE 推播通知中心", expanded=True):
+        col_line_1, col_line_2 = st.columns([3, 1])
+        
+        with col_line_1:
+            st.write(f"目前共有 **{len(notify_list)}** 位個案符合「需領藥」且「有 LINE ID」。")
+            if not notify_list.empty:
+                st.dataframe(notify_list[['個案姓名', 'LINE_ID', '目前狀態', '2nd_end', '3rd_end']], hide_index=True)
+        
+        with col_line_2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🚀 發送 LINE 提醒", type="primary", use_container_width=True, disabled=notify_list.empty):
+                success_count = 0
+                fail_count = 0
+                
+                progress_bar = st.progress(0)
+                
+                for idx, row in enumerate(notify_list.iterrows()):
+                    patient = row[1]
+                    # 組合訊息
+                    msg = (
+                        f"【慢箋領藥提醒】\n"
+                        f"{patient['個案姓名']} 您好，\n"
+                        f"系統偵測您目前的狀態為：{patient['目前狀態']}。\n"
+                        f"請記得在期限前攜帶健保卡與處方箋前往藥局領藥。\n"
+                        f"如有疑問請聯繫藥師。"
+                    )
+                    
+                    is_sent, log = send_line_push(patient['LINE_ID'], msg)
+                    if is_sent:
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                        st.error(f"{patient['個案姓名']} 發送失敗: {log}")
+                    
+                    progress_bar.progress((idx + 1) / len(notify_list))
+                
+                st.toast(f"發送完成！成功: {success_count}, 失敗: {fail_count}", icon="✅")
 
     # 刪除功能
     st.markdown("<div class='mt-4'></div>", unsafe_allow_html=True)
